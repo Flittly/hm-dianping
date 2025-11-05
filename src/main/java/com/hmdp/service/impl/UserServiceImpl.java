@@ -1,6 +1,7 @@
 package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.LoginFormDTO;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -67,13 +69,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             //2、如果不符合，返回错误信息
             return Result.fail("手机号格式错误！");
         }
-        //2、从redis中校验验证码
+        //3、从redis中校验验证码
         //Object cacheCode = session.getAttribute("code"); //从session获取
         String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
 
         String code = loginForm.getCode();
         if(cacheCode == null || !cacheCode.equals(code)) {
-            //3.、不一致，返回错误信息
+            //不一致，返回错误信息
             return Result.fail("验证码错误！");
         }
 
@@ -90,12 +92,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         String token =UUID.randomUUID().toString();
 
         //7.2 将User对象转为Hash存储
-        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-        Map<String, Object> userMap = BeanUtil.beanToMap(userDTO);
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class); //将完整的user转为userDTO，这样可以隐藏敏感的信息
+        Map<String, Object> userMap = BeanUtil.beanToMap(userDTO, new HashMap<>(),
+                CopyOptions.create().setIgnoreNullValue( true).setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString())); //转成Hash数据结构，Redis所需要键值对形式存储
+
 
         //7.3 存储
+        //session的有效期是30分钟
         String tokenKey = LOGIN_USER_KEY + token;
-        stringRedisTemplate.opsForHash().putAll(tokenKey, userMap);
+        stringRedisTemplate.opsForHash().putAll(tokenKey, userMap); //要求所有的键值对都为String类型
 
         //7.4 设置token有效期
         stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
