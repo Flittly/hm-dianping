@@ -62,6 +62,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
         //获取锁
         boolean isLock = lock.trylock(1200);
+
         if(isLock) {
             return Result.fail("获取锁失败,不允许重复下单");
         }
