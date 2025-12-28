@@ -1,5 +1,6 @@
 package com.hmdp.utils;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +16,8 @@ public class RedisIdWorker {
     private static final long BEGIN_TIMESTAMP = 1640995200L;
     public static final long COUNT_BITS = 32;
 
-    private RedisIdWorker(StringRedisTemplate stringRedisTemplate){
+    @Autowired
+    public RedisIdWorker(StringRedisTemplate stringRedisTemplate){
         this.stringRedisTemplate = stringRedisTemplate;
     }
 
