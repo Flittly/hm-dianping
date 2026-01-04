@@ -21,9 +21,15 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 
 /**
  * <p>
@@ -51,6 +57,21 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         SECKILL_SCRIPT.setResultType(Long.class);
     }
 
+    private BlockingQueue<VoucherOrder> orderTasks = new ArrayBlockingQueue<>(1024 * 1024);
+    private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
+
+    @PostConstruct
+    public void init() {
+        SECKILL_ORDER_EXECUTOR.submit(new VoucherOrderHandler());
+    }
+
+    private class VoucherOrderHandler implements Runnable {
+        @Override
+        public void run() {
+
+        }
+    }
+
     @Override
     public Result seckillVoucher(Long voucherId) {
         //获取用户
@@ -67,9 +88,16 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             //2.1 如果不是0，代表没有购买资格
             return Result.fail(r == 1 ? "库存不足" : "不能重复下单");
         }
-        //2.2 如果是0，代表购买资格，把下单信息保存到阻塞队列
+        // 2.2 有购买资格，扣减库存
+        VoucherOrder voucherOrder = new VoucherOrder();
+        // 2.3 创建订单
         long orderId = redisIdWorker.nextId("order");
-        // TODO 保存到阻塞队列
+        voucherOrder.setId(orderId);
+        // 2.4 设置用户id
+        voucherOrder.setUserId(userId);
+        voucherOrder.setVoucherId(voucherId);
+        //2.2 如果是0，代表购买资格，把下单信息保存到阻塞队列
+        orderTasks.add(voucherOrder);
         return Result.ok(orderId);
     }
 
